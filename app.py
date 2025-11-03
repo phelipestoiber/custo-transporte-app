@@ -195,6 +195,9 @@ with st.sidebar.expander("Parâmetros Financeiros e de Custo"):
 
 run_button = st.sidebar.button("Executar Simulações")
 
+st.sidebar.markdown("---") 
+st.sidebar.caption("Desenvolvido por [Eng. Phelipe Stoiber](https://linkedin.com/in/phelipestoiber)")
+
 # --- 4. PÁGINA PRINCIPAL (CORPO DO DASHBOARD) ---
 st.title("Dashboard de Análise de Viabilidade de Frota")
 
@@ -486,4 +489,5 @@ if run_button:
         except Exception as e:
             st.error(f"Erro ao gerar Matriz de Lucratividade: {e}")
 else:
+
     st.info("Ajuste os parâmetros na barra lateral e clique em 'Executar Simulações' para ver os resultados.")
