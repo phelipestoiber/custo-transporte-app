@@ -6,6 +6,12 @@ Este aplicativo, construído em Streamlit, permite que engenheiros navais, plane
 
 A ferramenta utiliza parâmetros de engenharia, operação e financeiros para executar simulações e fornecer análises de viabilidade.
 
+## Acesso Rápido (Online)
+
+O aplicativo está hospedado no Streamlit Community Cloud e pode ser acessado publicamente através do seguinte link:
+
+**[https://custo-transporte.streamlit.app/](https://custo-transporte.streamlit.app/)**
+
 ## Funcionalidades Principais
 
 O dashboard principal permite ao usuário ajustar dezenas de parâmetros e executa um conjunto de análises automaticamente:
