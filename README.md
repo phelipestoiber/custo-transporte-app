@@ -81,7 +81,7 @@ A função `calcular_custos_comboio` é a base de todas as análises e segue est
 
 1.  Clone este repositório:
     ```bash
-    git clone https://...
+    git clone https://github.com/phelipestoiber/custo-transporte-app
     ```
 2.  Instale as dependências. É recomendado criar um ambiente virtual:
     ```bash
