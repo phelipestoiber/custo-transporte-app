@@ -3,4 +3,5 @@ pandas
 numpy
 requests
 holidays
+matplotlib
 plotly
