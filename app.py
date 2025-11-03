@@ -196,7 +196,7 @@ with st.sidebar.expander("Parâmetros Financeiros e de Custo"):
 run_button = st.sidebar.button("Executar Simulações")
 
 st.sidebar.markdown("---") 
-st.sidebar.caption("Desenvolvido por \n[Eng. Naval Phelipe Stoiber](https://linkedin.com/in/phelipestoiber)")
+st.sidebar.markdown("Desenvolvido por:  \n[Eng. Naval Phelipe Stoiber](https://linkedin.com/in/phelipestoiber)")
 
 # --- 4. PÁGINA PRINCIPAL (CORPO DO DASHBOARD) ---
 st.title("Dashboard de Análise de Viabilidade de Frota")
@@ -491,4 +491,5 @@ if run_button:
 else:
 
     st.info("Ajuste os parâmetros na barra lateral e clique em 'Executar Simulações' para ver os resultados.")
+
 
