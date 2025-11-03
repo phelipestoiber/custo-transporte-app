@@ -91,7 +91,11 @@ A função `calcular_custos_comboio` é a base de todas as análises e segue est
     ```bash
     streamlit run app.py
     ```
-4.  A aplicação será aberta automaticamente no seu navegador.
+    ou em caso de erro
+    ```bash
+    python -m streamlit run app.py
+    ```
+5.  A aplicação será aberta automaticamente no seu navegador.
 
 ## Dependências
 
