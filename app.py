@@ -436,9 +436,9 @@ if run_button:
         **Tamanho da Frota:** {fmt_frota_d} comboios
         """)
 
-    # Análise F (Matriz de Lucratividade)
+    # Análise E (Matriz de Lucratividade)
     with st.spinner("Executando Análise F (Matriz de Lucratividade)..."):
-        st.header("Análise F.1: Matriz de Lucratividade (Lucro Anual Total em R$ Milhões)")
+        st.header("Análise E.1: Matriz de Lucratividade (Lucro Anual Total em R$ Milhões)")
         try:
             preco_central = preco_frete_input
             limite_inferior = preco_central - 5.0
@@ -478,7 +478,7 @@ if run_button:
             st.caption(f"Valores da Matriz (excluindo Custo) estão em R\$ Milhões por ano, baseados no Preço Central de R$ {preco_central:.2f}/t.")
             
             # Tabela 2: Margem de Lucro (%)
-            st.header("Análise F.2: Matriz de Margem de Lucro (%)")
+            st.header("Análise E.2: Matriz de Margem de Lucro (%)")
             st.dataframe(margin_matrix_df[['Custo (R$/t)'] + margin_cols]
                         .style
                         .background_gradient(cmap='RdYlGn', subset=margin_cols, axis=None)
@@ -491,5 +491,6 @@ if run_button:
 else:
 
     st.info("Ajuste os parâmetros na barra lateral e clique em 'Executar Simulações' para ver os resultados.")
+
 
 
