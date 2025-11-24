@@ -1,118 +1,98 @@
-# Custo-Transporte-App
+# Custo-Transporte-App: Simulador de Viabilidade Econômica Fluvial
 
-Aplicativo de simulação e análise de viabilidade econômica para comboios fluviais, focado no cálculo de custo (R$/tonelada) e na otimização de frotas.
+Este repositório contém uma ferramenta avançada de modelagem financeira e engenharia naval para simulação de custos de transporte em comboios fluviais. Desenvolvido em **Python** com interface **Streamlit**, o sistema oferece uma suíte completa de análises para tomada de decisão estratégica em logística hidroviária.
 
-Este aplicativo, construído em Streamlit, permite que engenheiros navais, planejadores logísticos e analistas financeiros modelem o Custo Total de Propriedade (TCO) para operações de comboios fluviais (empurradores e balsas).
+## 🎯 Objetivo
 
-A ferramenta utiliza parâmetros de engenharia, operação e financeiros para executar simulações e fornecer análises de viabilidade.
+Calcular o **Custo Total de Propriedade (TCO)** e o custo unitário (**R$/tonelada**) de operações fluviais, considerando:
+* **Física da Navegação:** Resistência ao avanço, potência (BHP), consumo de combustível e restrições de calado.
+* **Engenharia Econômica:** CAPEX (Amortização SAC/Price via FRC), OPEX Fixo (Tripulação, Seguros) e Variável (Diesel).
+* **Sazonalidade:** Impacto da variação do nível do rio (calado dinâmico) mês a mês na capacidade de carga.
 
-## Acesso Rápido (Online)
+## 🚀 Funcionalidades (Módulos de Análise)
 
-O aplicativo está hospedado no Streamlit Community Cloud e pode ser acessado publicamente através do seguinte link:
+O dashboard está dividido em 8 abas de análise estratégica:
 
-**[https://custo-transporte.streamlit.app/](https://custo-transporte.streamlit.app/)**
+1.  **Cenário Atual (Base):** Simulação detalhada dos parâmetros inseridos, com breakdown de custos (Pizza) e tabela de operação mensal.
+2.  **Sensibilidade:** Gráfico de Tornado analisando o impacto (+/- 10%) de variáveis críticas (Combustível, Velocidade, Juros, etc.) no custo final.
+3.  **Break-Even (Ponto de Equilíbrio):** Cálculo do volume mínimo para viabilidade financeira, com alertas visuais de capacidade excedida.
+4.  **Velocidade Fixa (Otimização OPEX):** Encontra a velocidade operacional ideal considerando um motor pré-definido.
+5.  **Otimização de Frota:** Dimensionamento do número de comboios para atender uma demanda anual de mercado (ex: 2M tons).
+6.  **Otimização Global (Design vs. Operação):**
+    * Algoritmo iterativo que simula a compra de diferentes motores (**Decisão de Investimento/CAPEX**).
+    * Otimiza a operação mês a mês respeitando a potência do motor escolhido (**Decisão Operacional/OPEX**).
+7.  **Matriz de Lucratividade:** Mapa de calor (Heatmap) cruzando **Velocidade** vs **Preço de Frete** para visualizar margens de lucro e riscos.
+8.  **Sustentabilidade ($CO_2$):** Cálculo de emissões totais e intensidade de carbono ($kgCO_2/t$), analisando o trade-off entre custo financeiro e impacto ambiental.
 
-## Funcionalidades Principais
+## 🏗️ Arquitetura do Projeto
 
-O dashboard principal permite ao usuário ajustar dezenas de parâmetros e executa um conjunto de análises automaticamente:
+O código foi refatorado para seguir uma arquitetura modular e desacoplada:
 
-  * **Simulação Dinâmica (Base):**
-    Calcula o desempenho e o custo do comboio (R$/t) considerando a variação da profundidade do rio mês a mês. O calado operacional é ajustado dinamicamente, afetando a capacidade de carga em cada viagem.
+* **`app.py` (Interface):** Camada de apresentação (View). Gerencia os inputs do usuário na Sidebar, chama os controladores e renderiza gráficos (Plotly) e tabelas.
+* **`analysis.py` (Controller / Business Logic):** Cérebro da aplicação. Contém os loops de otimização, algoritmos de busca e orquestração de cenários.
+* **`engine.py` (Core):** Motor de cálculo determinístico. Contém as funções puras para cálculo de CAPEX, OPEX e Física Naval. Não contém lógica de iteração.
+* **`helpers.py` (Utils):** Fórmulas de engenharia naval (estimativa de peso leve, resistência ao avanço, arranjo de comboios).
+* **`data_utils.py` (Data):** Conectores externos (ex: API do Banco Central para taxa SELIC).
 
-  * **Análise A: Sensibilidade (Gráfico de Tornado):**
-    Testa o impacto no custo final (R$/t) ao variar os principais parâmetros de entrada (como preço do combustível, taxa de juros, velocidade, etc.) em +/- 10%.
-
-  * **Análise B: Ponto de Equilíbrio (Break-Even):**
-    Com base em um preço de frete (R$/t) inserido pelo usuário, calcula o volume mínimo de carga (em toneladas) que o comboio precisa transportar anualmente para cobrir todos os custos fixos e variáveis.
-
-  * **Análise C: Otimização de Velocidade (Comboio Único):**
-    Executa a simulação dinâmica completa para uma faixa de velocidades (ex: 4 a 9 nós) e identifica qual velocidade resulta no menor custo por tonelada (R$/t) para um *único comboio*.
-
-  * **Análise D: Otimização de Frota (Negócio Total):**
-    Utiliza os resultados da Análise C para calcular o custo ótimo para atender a uma *demanda de mercado total*. Esta análise encontra a velocidade que minimiza o custo final para o negócio como um todo, calculando a frota necessária (número de comboios) para cada ponto de velocidade.
-
-  * **Análise F: Matriz de Lucratividade:**
-    Gera duas matrizes (Lucro Anual Total em R$ Milhões e Margem de Lucro %) que cruzam diferentes velocidades de operação com diferentes preços de frete, permitindo uma visualização clara dos cenários de maior rentabilidade.
-
-## Arquitetura do Projeto
-
-O código é modularizado para separar a interface, a lógica de análise e o motor de cálculo:
-
-  * **`app.py`**
-
-      * O frontend da aplicação, construído com **Streamlit**.
-      * Responsável por renderizar a interface do usuário (sidebar de parâmetros e painel de resultados).
-      * Coleta todas as entradas do usuário e orquestra a execução das simulações ao chamar as funções do `analysis.py`.
-      * Exibe os resultados em forma de métricas, tabelas (Pandas) e gráficos (Plotly).
-
-  * **`analysis.py`**
-
-      * Contém a lógica de negócios e as funções para cada análise (A, B, C, D).
-      * Orquestra as simulações. Por exemplo, a `run_simulacao_dinamica` chama o `engine.py` 12 vezes (uma para cada mês) para simular o ano dinâmico. A `run_analysis_velocity_optimization` chama a `run_simulacao_dinamica` múltiplas vezes (uma para cada velocidade testada).
-
-  * **`engine.py`**
-
-      * O "motor" de cálculo principal do projeto.
-      * Contém a função `calcular_custos_comboio`, que recebe todos os parâmetros de engenharia, operação e finanças.
-      * Executa uma única simulação estática (para um calado e dias de operação definidos) e retorna um dicionário com todos os custos (CAPEX, OPEX) e métricas de desempenho (viagens, carga total, etc.).
-
-  * **`data_utils.py`**
-
-      * Módulo utilitário para buscar dados externos.
-      * Inclui uma função para buscar a meta da taxa SELIC (taxa de juros) mais recente da API do Banco Central do Brasil (BCB), usada como valor padrão no formulário.
-
-## Lógica de Cálculo Principal (Engine)
-
-A função `calcular_custos_comboio` é a base de todas as análises e segue esta lógica:
-
-1.  **Formação do Comboio:** Determina automaticamente a formação ideal do comboio (número de balsas na longitudinal vs. paralela) com base nas restrições de engenharia inseridas (raio de curvatura do rio e largura do canal).
-2.  **Capacidade de Carga:** Calcula a capacidade de carga por balsa e por comboio com base no calado operacional (`calado_op_input`) fornecido para a simulação.
-3.  **Cálculo de Tempos:** Calcula o tempo de ida (a favor da correnteza) e volta (contra a correnteza), além dos tempos de eclusagem, manobra e operação portuária (carga/descarga), resultando no tempo total de viagem.
-4.  **Desempenho Anual:** Com base no tempo de viagem e nos dias de operação, calcula o número total de viagens por ano e a carga total transportada.
-5.  **Custos (CAPEX e OPEX):**
-      * Calcula o **CAPEX** (Custo de Capital) usando fórmulas empíricas para o custo de construção do empurrador (baseado no BHP necessário) e das balsas (baseado no peso leve).
-      * Anualiza o CAPEX usando o Fator de Recuperação de Capital (FRC) com base na taxa de juros e vida útil.
-      * Calcula o **OPEX Fixo** (tripulação, alimentação, seguros, manutenção) e o **OPEX Variável** (principalmente combustível, com base no consumo do motor, BHP e tempo de viagem).
-6.  **Resultado Final:** Retorna o custo total anual, custo por tonelada (R$/t) e custo por tonelada-quilômetro (R$/t-km).
-
-## Avisos Importantes e Limitações
+## ⚠️ Avisos Importantes e Limitações
 
 **Atenção:** Este simulador é uma ferramenta de modelagem e deve ser usado com as seguintes ressalvas:
 
 1.  **Dados de Profundidade (Calado):** Os níveis médios mensais do rio (a variável `LISTA_PROF_MESES`) estão fixados diretamente no código-fonte do arquivo `app.py`. Para uma simulação correta, o usuário **deve** alterar esta lista para que reflita os dados históricos ou projetados do trecho de rio específico a ser analisado.
 
-2.  **Fórmulas Empíricas:** Os cálculos de engenharia, como o `bhp_necessario`, `custo_construcao_comboio` e `custo_construcao_empurrador` (localizados em `engine.py`), são baseados em fórmulas empíricas e regressões. Estas fórmulas podem necessitar de calibração ou substituição dependendo da frota, estaleiro e bacia hidrográfica em questão.
+2.  **Fórmulas Empíricas:** Os cálculos de engenharia, como o `bhp_necessario`, `custo_construcao_comboio` e `custo_construcao_empurrador` (localizados em `helpers.py`), são baseados em fórmulas empíricas e regressões. Estas fórmulas podem necessitar de calibração ou substituição dependendo da frota, estaleiro e bacia hidrográfica em questão.
 
-## Como Executar
+## 🔧 Como Executar
 
-1.  Clone este repositório:
+### Pré-requisitos
+* Python 3.8+
+* Virtualenv (recomendado)
+
+### Instalação e Execução
+
+1.  Clone o repositório:
     ```bash
-    git clone https://github.com/phelipestoiber/custo-transporte-app
+    git clone [https://github.com/seu-usuario/custo-transporte-app.git](https://github.com/seu-usuario/custo-transporte-app.git)
+    cd custo-transporte-app
     ```
-2.  Instale as dependências. É recomendado criar um ambiente virtual:
+
+2.  Crie e ative um ambiente virtual (opcional, mas recomendado):
+    ```bash
+    python -m venv .venv
+    # Windows:
+    .venv\Scripts\activate
+    # Linux/Mac:
+    source .venv/bin/activate
+    ```
+
+3.  Instale as dependências:
     ```bash
     pip install -r requirements.txt
     ```
-3.  Execute a aplicação Streamlit:
+
+4.  Execute a aplicação Streamlit:
     ```bash
     streamlit run app.py
     ```
-    ou em caso de erro
+    Ou, em caso de erro no comando acima:
     ```bash
     python -m streamlit run app.py
     ```
+
 5.  A aplicação será aberta automaticamente no seu navegador.
 
-## Dependências
+## 📊 Metodologia de Cálculo
 
-O projeto requer as seguintes bibliotecas Python:
+* **Dimensionamento de Motor:** Baseado na fórmula de resistência ao avanço (Fórmula de Howe/Empírica) ajustada para águas rasas.
+* **Custo de Capital:** Utiliza o **Fator de Recuperação de Capital (FRC)** para anualizar o investimento considerando a taxa de atratividade (WACC/SELIC).
+* **Restrições Físicas:** O algoritmo de otimização global verifica mês a mês se a potência exigida pela velocidade desejada ($BHP_{req}$) não excede a potência instalada do motor ($BHP_{inst}$).
 
-```
-# requirements.txt
-streamlit
-pandas
-numpy
-plotly
-requests
-holidays
-```
+## 🛠️ Tecnologias Utilizadas
+
+* **Streamlit:** Frontend interativo.
+* **Pandas & NumPy:** Manipulação de dados e vetores.
+* **Plotly:** Visualização de dados (Gráficos interativos).
+* **Requests:** Integração com APIs externas.
+
+---
+*Desenvolvido para análise estratégica de logística fluvial na região Amazônica.*
