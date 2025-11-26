@@ -31,27 +31,57 @@ demanda_anual = st.sidebar.number_input(
 )
 
 with st.sidebar.expander("2. Engenharia e Rio"):
-    folga_seguranca = st.number_input("Folga de Segurança (m)", value=0.50)
-    calado_design_alvo = st.number_input("Calado de Design (m)", value=3.66)
-    dias_base_anuais = st.number_input("Dias Disponíveis/Ano", value=330.0)
-    dist_km_input = st.number_input("Distância de Viagem (km)", value=500.0)
-    comp_balsa = st.number_input("Comprimento Balsa (m)", value=60.96)
-    boca_balsa = st.number_input("Boca Balsa (m)", value=10.67)
-    pontal_balsa = st.number_input("Pontal Balsa (m)", value=4.27)
-    coef_bloco = st.number_input("Coef. Bloco (Cb)", value=0.90)
-    raio_curvatura = st.number_input("Raio Curvatura Rio (m)", value=750.0)
-    largura_canal = st.number_input("Largura Canal (m)", value=70.0)
+    folga_seguranca = st.number_input(
+        "Folga de Segurança (m)", value=0.50,
+        help="Margem vertical entre o fundo do rio e o fundo da balsa."
+    )
+    calado_design_alvo = st.number_input(
+        "Calado de Design (m)", value=3.66,
+        help="Calado máximo de projeto da embarcação. Usado como referência."
+    )
+    dias_base_anuais = st.number_input(
+        "Dias Disponíveis/Ano", value=330.0,
+        help="Total de dias operacionais no ano, descontando paradas programadas."
+    )
+    dist_km_input = st.number_input(
+        "Distância de Viagem (km)", value=500.0,
+        help="Distância total de uma perna da viagem (ida)."
+    )
+    comp_balsa = st.number_input(
+        "Comprimento Balsa (m)", value=60.96,
+        help="Comprimento total de uma única balsa."
+    )
+    boca_balsa = st.number_input(
+        "Boca Balsa (m)", value=10.67,
+        help="Largura total de uma única balsa."
+    )
+    pontal_balsa = st.number_input(
+        "Pontal Balsa (m)", value=4.27,
+        help="Altura da balsa, da quilha ao convés principal."
+    )
+    coef_bloco = st.number_input(
+        "Coef. Bloco (Cb)", value=0.90,
+        help="Medida da 'quadratura' do casco submerso. Afeta a capacidade de carga."
+    )
+    raio_curvatura = st.number_input(
+        "Raio Curvatura Rio (m)", value=750.0,
+        help="Menor raio de curvatura do rio na rota, para cálculo de formação do comboio."
+    )
+    largura_canal = st.number_input(
+        "Largura Canal (m)", value=70.0,
+        help="Largura do canal de navegação, para cálculo de formação do comboio."
+    )
 
 with st.sidebar.expander("3. Operação (Base)"):
-    vel_embarcacao_nos = st.slider("Velocidade Alvo (nós)", 4.0, 12.0, 8.0, 0.1)
-    vel_correnteza_nos = st.number_input("Velocidade Correnteza (nós)", value=1.92)
-    t_eclusagem_min = st.number_input("Tempo Eclusa (min)", value=92.0)
-    t_manobra_balsa_min = st.number_input("Tempo Manobra/Balsa (min)", value=20.0)
-    num_bercos = st.number_input("Nº Berços", value=2)
-    prod_carregamento = st.number_input("Prod. Carga (t/h)", value=2500.0)
-    prod_descarregamento = st.number_input("Prod. Descarga (t/h)", value=1250.0)
-    num_tripulantes = st.number_input("Tripulação", value=8)
-    eficiencia_propulsor = st.number_input("Eficiência Propulsiva", value=0.50)
+    vel_embarcacao_nos = st.slider("Velocidade Alvo (nós)", 4.0, 12.0, 8.0, 0.1, help="Velocidade de serviço alvo do comboio em águas paradas.")
+    vel_correnteza_nos = st.number_input("Velocidade Correnteza (nós)", value=1.92, help="Velocidade média da correnteza do rio.")
+    t_eclusagem_min = st.number_input("Tempo Eclusa (min)", value=92.0, help="Tempo total gasto em cada passagem por uma eclusa.")
+    t_manobra_balsa_min = st.number_input("Tempo Manobra/Balsa (min)", value=20.0, help="Tempo adicional de manobra por balsa no comboio.")
+    num_bercos = st.number_input("Nº Berços", value=2, help="Número de berços disponíveis para carga/descarga no terminal.")
+    prod_carregamento = st.number_input("Prod. Carga (t/h)", value=2500.0, help="Taxa de carregamento de grãos no terminal (toneladas/hora).")
+    prod_descarregamento = st.number_input("Prod. Descarga (t/h)", value=1250.0, help="Taxa de descarregamento de grãos no terminal (toneladas/hora).")
+    num_tripulantes = st.number_input("Tripulação", value=8, help="Número total de tripulantes por comboio.")
+    eficiencia_propulsor = st.number_input("Eficiência Propulsiva", value=0.50, help="Eficiência do conjunto propulsor (motor, eixo, hélice).")
 
 with st.sidebar.expander("4. Financeiro"):
     try:
@@ -59,15 +89,27 @@ with st.sidebar.expander("4. Financeiro"):
     except:
         taxa_juros_base, info_selic = 0.15, "Padrão (Falha API)"
         
-    taxa_juros_input_pct = st.number_input(f"Taxa de Juros Anual (%) - {info_selic}", value=taxa_juros_base * 100)
+    taxa_juros_input_pct = st.number_input(
+        f"Taxa de Juros Anual (%) - {info_selic}", value=taxa_juros_base * 100,
+        help="Custo do capital (WACC) ou taxa de desconto para o CAPEX."
+    )
     taxa_juros_input = taxa_juros_input_pct / 100.0
-    vida_util_anos = st.number_input("Vida Útil (anos)", value=20)
-    preco_combustivel = st.number_input("Preço Diesel (R$/L)", value=6.06)
-    consumo_motor_fc = st.number_input("Consumo Específico (kg/HP/h)", value=0.16)
-    densidade_combustivel = st.number_input("Densidade Diesel (kg/L)", value=0.85)
-    salario_medio = st.number_input("Salário Médio (R$)", value=4500.0)
-    vale_alimentacao = st.number_input("Vale Alimentação (R$)", value=720.0)
-    encargos_sociais_pct = st.number_input("Encargos Sociais (%)", value=0.90)
+    vida_util_anos = st.number_input("Vida Útil (anos)", value=20, help="Período de amortização do investimento no comboio.")
+    preco_combustivel = st.number_input("Preço Diesel (R$/L)", value=6.06, help="Preço do diesel marítimo por litro.")
+    consumo_motor_fc = st.number_input(
+        "Consumo Específico (kg/HP/h)", value=0.16,
+        help="Consumo específico de combustível do motor principal."
+    )
+    densidade_combustivel = st.number_input(
+        "Densidade Diesel (kg/L)", value=0.85,
+        help="Densidade do diesel para conversão de massa para volume."
+    )
+    salario_medio = st.number_input("Salário Médio (R$)", value=4500.0, help="Salário base médio de um tripulante.")
+    vale_alimentacao = st.number_input("Vale Alimentação (R$)", value=720.0, help="Benefício de alimentação mensal por tripulante.")
+    encargos_sociais_pct = st.number_input(
+        "Encargos Sociais (%)", value=0.90,
+        help="Percentual de encargos sobre o salário (INSS, FGTS, etc.)."
+    )
 
 run_button = st.sidebar.button("EXECUTAR SIMULAÇÃO", type="primary")
 
@@ -332,27 +374,71 @@ if run_button:
 
     # --- ABA 5: OTIMIZAÇÃO GLOBAL ---
     with tab5:
-        st.header("Otimização Global de Design (CAPEX + OPEX)")
-        st.markdown("Iteração sobre diferentes tamanhos de motor para encontrar o menor **Custo Total de Propriedade (TCO)**.")
+        st.header("Otimização Global (Design Iterativo)")
+        st.markdown("Iteração sobre diferentes tamanhos de motor para encontrar o menor **Custo Total de Propriedade (TCO)**, ajustando a operação mês a mês.")
         
-        with st.spinner("Executando otimização iterativa..."):
-            res_global = analysis.run_global_optimization_refined(PARAMS, LISTA_PROF_MESES, calado_design_alvo, folga_seguranca, dias_base_anuais)
+        with st.spinner("Executando algoritmo de Descida Coordenada..."):
+            # Chama a função robusta de otimização global
+            res_global = analysis.run_global_optimization(
+                PARAMS, LISTA_PROF_MESES, calado_design_alvo, folga_seguranca, dias_base_anuais
+            )
             
+            # Extrai os resultados da estrutura hierárquica
+            best = res_global['melhor_cenario']
+            df_opt = res_global['tabela_operacao_otima']
+            
+            # --- 1. KPIs do Vencedor ---
             col1, col2, col3 = st.columns(3)
+            
             with col1:
                 st.success("### Vencedor Global")
-                st.metric("Velocidade de Projeto (Motor)", f"{res_global['v_design']:.2f} nós")
-                st.metric("Potência Instalada (BHP)", f"{res_global['bhp']:.0f} HP")
+                # Usa .get() para garantir compatibilidade se a chave mudar ligeiramente
+                v_design = best.get('v_design_otima', best.get('v_design', 0))
+                bhp_ideal = best.get('bhp_ideal', best.get('bhp', 0))
+                
+                st.metric("Velocidade de Projeto (Motor)", f"{v_design:.1f} nós")
+                st.metric("Potência Instalada (BHP)", f"{bhp_ideal:.0f} HP")
             
             with col2:
-                st.warning("### Impacto Financeiro")
-                st.metric("Investimento Inicial (Unid.)", f"R$ {res_global['investimento']:,.2f}")
-                st.metric("Custo Mínimo Global", f"R$ {res_global['custo']:.2f} /t")
+                st.info("### Financeiro")
+                investimento = best.get('investimento_inicial', best.get('investimento', 0))
+                custo_min = best.get('custo_minimo_global', best.get('custo', 0))
+                
+                st.metric("Investimento Inicial", f"R$ {investimento:,.2f}")
+                st.metric("Custo Mínimo Global", f"R$ {custo_min:.2f} /t")
 
             with col3:
                 st.warning("### Ambiental")
-                st.metric("Emissões Totais", f"{res_global['emissoes_total']:,.0f} tCO2/ano")
-                st.metric("Intensidade", f"{res_global['intensidade_co2']:.2f} kgCO2/t")
+                emissoes = best.get('emissoes_total', 0)
+                intensidade = best.get('intensidade_co2', 0)
+                
+                st.metric("Emissões Totais", f"{emissoes:,.0f} tCO2/ano")
+                if intensidade > 0:
+                    st.metric("Intensidade", f"{intensidade:.2f} kgCO2/t")
+                else:
+                    st.metric("Intensidade", "N/A")
+            
+            st.divider()
+            
+            # --- 2. Tabela de Operação Mensal ---
+            st.subheader(f"Plano de Operação Mensal (Motor de {v_design:.1f} nós)")
+            st.markdown("Observe como a **Velocidade Op** se ajusta ao **Calado** para minimizar o custo global.")
+            
+            if not df_opt.empty:
+                # Formatação para exibição limpa
+                st.dataframe(
+                    df_opt.style.format({
+                        'Calado (m)': '{:.2f}',
+                        'Velocidade Op (nós)': '{:.1f}',
+                        'Custo Mês (R$/t)': '{:.2f}',
+                        'Carga (t)': '{:,.0f}',
+                        'Emissões (tCO2)': '{:.1f}'
+                    }, na_rep="-"),
+                    use_container_width=True,
+                    height=480
+                )
+            else:
+                st.warning("Não foi possível gerar a tabela detalhada.")
 
     # --- ABA 6: MATRIZ DE LUCRATIVIDADE ---
     with tab6:
