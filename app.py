@@ -177,12 +177,13 @@ if run_button:
         st.markdown(f"Condição atual: **{vel_embarcacao_nos} nós** | Calado Alvo: **{calado_design_alvo}m**")
         
         # 1. Métricas Principais
-        col1, col2, col3, col4, col5 = st.columns(5)
+        col1, col2, col3, col4, col5, col6 = st.columns(6)
         col1.metric("Formação", f"{res_base_detalhada['n_long']}x{res_base_detalhada['n_par']}")
         col2.metric("Custo Unitário", f"R$ {res_base_detalhada['custo_unitario']:.2f} /t".replace('.',','))
         col3.metric("Carga Anual", f"{res_base_detalhada['carga_anual']:,.0f} t".replace(',','.'))
         col4.metric("Viagens Totais", f"{res_base_detalhada['viagens_anuais']:.0f}")
         col5.metric("Custo Total Anual (Comboio)", f"R$ {res_base_detalhada['custo_total_anual']/1e6:,.2f}M".replace('.',','))
+        col6.metric("BHP Instalado", f"{res_base_detalhada['bhp_instalado']:.0f} HP")
         
         st.divider()
 
@@ -262,8 +263,7 @@ if run_button:
             
             # Formatação condicional da métrica de ocupação
             ocupacao_pct = res_be['ocupacao_necessaria_pct']
-            delta_color = "normal" if ocupacao_pct <= 100 else "inverse" # Fica vermelho se estourar 100%
-            c3.metric("Taxa de Ocupação Necessária", f"{ocupacao_pct:.1f}%", delta=f"{100-ocupacao_pct:.1f}% (Folga)", delta_color=delta_color)
+            c3.metric("Taxa de Ocupação Necessária", f"{ocupacao_pct:.1f}%", delta=f"{100-ocupacao_pct:.1f}% (Folga)")
             
             with st.expander("📊 Detalhes Financeiros do Equilíbrio", expanded=True):
                 col_a, col_b, col_c, col_d, col_e = st.columns(5)
@@ -395,8 +395,9 @@ if run_button:
                 # Usa .get() para garantir compatibilidade se a chave mudar ligeiramente
                 v_design = best.get('v_design_otima', best.get('v_design', 0))
                 bhp_ideal = best.get('bhp_ideal', best.get('bhp', 0))
+                v_media = df_opt.loc[:, 'Velocidade Op (nós)'].mean()
                 
-                st.metric("Velocidade de Projeto (Motor)", f"{v_design:.1f} nós")
+                st.metric("Velocidade de Operação Média (Motor)", f"{v_media:.1f} nós")
                 st.metric("Potência Instalada (BHP)", f"{bhp_ideal:.0f} HP")
             
             with col2:
@@ -421,7 +422,7 @@ if run_button:
             st.divider()
             
             # --- 2. Tabela de Operação Mensal ---
-            st.subheader(f"Plano de Operação Mensal (Motor de {v_design:.1f} nós)")
+            st.subheader(f"Plano de Operação Mensal (Motor de {bhp_ideal:.0f} HP)")
             st.markdown("Observe como a **Velocidade Op** se ajusta ao **Calado** para minimizar o custo global.")
             
             if not df_opt.empty:
@@ -430,12 +431,14 @@ if run_button:
                     df_opt.style.format({
                         'Calado (m)': '{:.2f}',
                         'Velocidade Op (nós)': '{:.1f}',
+                        'Potência (HP)': '{:.0f}',
                         'Custo Mês (R$/t)': '{:.2f}',
                         'Carga (t)': '{:,.0f}',
                         'Emissões (tCO2)': '{:.1f}'
                     }, na_rep="-"),
                     use_container_width=True,
-                    height=480
+                    height=480,
+                    hide_index=True
                 )
             else:
                 st.warning("Não foi possível gerar a tabela detalhada.")

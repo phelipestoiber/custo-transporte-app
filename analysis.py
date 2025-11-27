@@ -78,9 +78,13 @@ def _simular_ano_operacional(
     if override_bhp:
         bhp_instalado = override_bhp
     else:
+        profundidade_design_critica = calado_maximo_ano + folga_seguranca
+
         bhp_instalado = engine.helpers.calcular_bhp_propulsao(
-            vol_desloc_max, params['comp_balsa'], params['boca_balsa'],
-            n_long, n_par, v_design, params['eficiencia_propulsor']
+            params['comp_balsa'], params['boca_balsa'],
+            calado_m=calado_maximo_ano, largura_canal_m=params['largura_canal'],
+            profundidade_canal_m=profundidade_design_critica,
+            n_long=n_long, n_par=n_par, vel_nos=v_design, eficiencia_global=params['eficiencia_propulsor']
         )
 
     # Calcula o CAPEX Anualizado (Investimento)
@@ -117,6 +121,8 @@ def _simular_ano_operacional(
         res_var = engine.calcular_opex_variavel(
             distancia_km=params['dist_km_input'],
             dias_operacao_periodo=dias_op_mes,
+            largura_canal=params['largura_canal'],
+            profundidade_rio=prof_mes,
             vel_embarcacao_nos=v_mes,
             vel_correnteza_nos=params['vel_correnteza_nos'],
             calado_operacional=calado_mes,
@@ -242,25 +248,47 @@ def run_detailed_base_simulation(
     Roda a simulação detalhada para o Cenário Base (Inputs do usuário).
     Retorna breakdown completo de custos e tabela mensal.
     """
-    print("--- EXECUTANDO: Simulação Detalhada do Cenário Base ---")
-    
-    # 1. Engenharia e Custos Fixos
-    calado_maximo_ano = min(calado_design_alvo, max(lista_prof_meses) - folga_seguranca)
-    
+    print("--- EXECUTANDO: Simulação Detalhada do Cenário Base ---")    
+    # 1. Engenharia e Dimensionamento do Motor (BHP)
     n_long, n_par = helpers.calcular_arranjo_comboio(
         params['comp_balsa'], params['boca_balsa'], 
         params['raio_curvatura'], params['largura_canal']
     )
-    
-    vol_desloc_max = helpers.calcular_volume_operacional_balsa(
-        params['comp_balsa'], params['boca_balsa'], calado_maximo_ano, params['coef_bloco']
-    ) * (n_long * n_par)
-    
-    bhp_instalado = helpers.calcular_bhp_propulsao(
-        vol_desloc_max, params['comp_balsa'], params['boca_balsa'],
-        n_long, n_par, params['vel_embarcacao_nos'], params['eficiencia_propulsor']
-    )
 
+    # AJUSTE: Encontrar a verdadeira "pior condição" de potência requerida ao longo do ano.
+    # Itera sobre cada mês para encontrar o BHP máximo necessário.
+    bhp_max_requerido_ano = 0.0
+    for prof_mes in lista_prof_meses:
+        print("\n--- DEBUG: Iterando para encontrar o BHP máximo requerido ---")
+        for i, prof_mes in enumerate(lista_prof_meses):
+            # Calcula o calado máximo possível para este mês específico
+            calado_op_mes = helpers.calcular_calado_maximo_operacional(prof_mes, folga_seguranca, calado_design_alvo)
+            print(f"  > Mês {i+1:02d}: Profundidade={prof_mes:.2f}m -> Calado Operacional Máx={calado_op_mes:.2f}m")
+            
+            if calado_op_mes <= 0:
+                print(f"  > Mês {i+1:02d}: Não navegável (calado <= 0).")
+                continue # Mês não navegável
+
+            # Calcula o BHP para esta condição específica (calado_op_mes, prof_mes)
+            print(f"  > Mês {i+1:02d}: prof={prof_mes:.2f}m, calado_op={calado_op_mes:.2f}m")
+            bhp_necessario_mes = helpers.calcular_bhp_propulsao(
+                params['comp_balsa'], params['boca_balsa'],
+                calado_m=calado_op_mes, largura_canal_m=params['largura_canal'], 
+                profundidade_canal_m=prof_mes,
+                n_long=n_long, n_par=n_par, vel_nos=params['vel_embarcacao_nos'],
+                eficiencia_global=params['eficiencia_propulsor']
+            )
+            print(f"    - BHP necessário para o mês: {bhp_necessario_mes:,.2f} HP")
+
+            # Atualiza o máximo encontrado
+            if bhp_necessario_mes > bhp_max_requerido_ano:
+                bhp_max_requerido_ano = bhp_necessario_mes
+                print(f"    - NOVO MÁXIMO ENCONTRADO!")
+                
+        bhp_instalado = bhp_max_requerido_ano
+    print(f"--- FIM DEBUG: BHP Instalado definido como: {bhp_instalado:,.2f} HP ---\n")
+
+    # 2. Cálculo de Custos Fixos com base no motor dimensionado
     res_capex = engine.calcular_capex(
         params['comp_balsa'], params['boca_balsa'], params['pontal_balsa'],
         n_long, n_par, bhp_instalado, params['taxa_juros_input'], params['vida_util_anos']
@@ -271,7 +299,7 @@ def run_detailed_base_simulation(
         params['salario_medio'], params['vale_alimentacao'], params['encargos_sociais_pct']
     )
     
-    # 2. Loop Mensal (Variáveis)
+    # 3. Loop Mensal (Custos Variáveis e Produtividade)
     custo_combustivel_anual = 0.0
     carga_total = 0.0
     viagens_totais = 0.0
@@ -280,11 +308,13 @@ def run_detailed_base_simulation(
     dias_op_mes = dias_base_anuais / 12.0
     
     for i, prof_mes in enumerate(lista_prof_meses):
-        calado_mes = min(calado_design_alvo, prof_mes - folga_seguranca)
+        calado_mes = helpers.calcular_calado_maximo_operacional(prof_mes, folga_seguranca, calado_design_alvo)
         
         res_var = engine.calcular_opex_variavel(
             distancia_km=params['dist_km_input'],
             dias_operacao_periodo=dias_op_mes,
+            largura_canal=params['largura_canal'],
+            profundidade_rio=prof_mes,
             vel_embarcacao_nos=params['vel_embarcacao_nos'],
             vel_correnteza_nos=params['vel_correnteza_nos'],
             calado_operacional=calado_mes,
@@ -319,7 +349,7 @@ def run_detailed_base_simulation(
             'Emissões (tCO2)': res_var['emissoes_co2_ton']
         })
         
-    # 3. Consolidação
+    # 4. Consolidação
     # Admin Variável (10% do Combustível)
     custo_admin_var = 0.10 * custo_combustivel_anual
     
@@ -346,7 +376,8 @@ def run_detailed_base_simulation(
         'breakdown_custos': breakdown,
         'df_mensal': pd.DataFrame(tabela_mensal),
         'emissoes_total_ton': emissoes_totais,
-        'intensidade_carbono_kg_t': carbon_intensity
+        'intensidade_carbono_kg_t': carbon_intensity,
+        'bhp_instalado': bhp_instalado
     }
 
 def run_sensitivity_analysis(
@@ -494,7 +525,7 @@ def run_fixed_speed_optimization(
     """
     print("--- EXECUTANDO: Análise 3 - Melhor Velocidade Fixa ---")
     
-    velocidades = np.arange(4.0, 10.1, 0.1)
+    velocidades = np.arange(3.0, 8.1, 0.1)
     resultados = []
     
     for v in velocidades:
@@ -532,7 +563,7 @@ def run_fleet_optimization(
     """
     print(f"--- EXECUTANDO: Análise 4 - Otimização de Frota (Demanda: {demanda_total:,.0f} t) ---")
     
-    velocidades = np.arange(4.0, 10.1, 0.1)
+    velocidades = np.arange(3.0, 8.1, 0.1)
     resultados = []
     
     for v in velocidades:
@@ -598,7 +629,7 @@ def run_global_optimization(
     # Iteramos sobre "Velocidades de Projeto". Cada velocidade define implicitamente
     # um tamanho de motor (BHP) necessário para atingir essa velocidade na pior condição
     # (cheia/carga máxima). Isso discretiza o problema de investimento (CAPEX).
-    velocidades_projeto = np.arange(4.0, 10.1, 0.1) 
+    velocidades_projeto = np.arange(3.0, 8.1, 0.1) 
     dias_op_por_mes = dias_base_anuais / 12.0
     
     melhor_cenario_global = None
@@ -619,16 +650,17 @@ def run_global_optimization(
             params['comp_balsa'], params['boca_balsa'], 
             params['raio_curvatura'], params['largura_canal']
         )
-        
-        # Deslocamento máximo (Fully Loaded) para dimensionamento conservador
-        vol_desloc_max = engine.helpers.calcular_volume_operacional_balsa(
-            params['comp_balsa'], params['boca_balsa'], calado_maximo, params['coef_bloco']
-        ) * (n_long * n_par)
-        
+               
         # Potência Instalada (BHP): O limite físico do motor comprado
+        # Dimensionar para a condição de maior arrasto (Full Load + Low Water)
+        profundidade_design_critica = calado_maximo + folga_seguranca
+
         bhp_instalado = engine.helpers.calcular_bhp_propulsao(
-            vol_desloc_max, params['comp_balsa'], params['boca_balsa'],
-            n_long, n_par, v_design, params['eficiencia_propulsor']
+            params['comp_balsa'], params['boca_balsa'],
+            calado_m=calado_maximo, largura_canal_m=params['largura_canal'],
+            profundidade_canal_m=profundidade_design_critica,
+            n_long=n_long, n_par=n_par, vel_nos=v_design,
+            eficiencia_global=params['eficiencia_propulsor']
         )
         
         # Cálculo do Custo Fixo Anual (Constante para este design)
@@ -649,7 +681,7 @@ def run_global_optimization(
         opcoes_meses = [] # Lista de listas de dicionários
         
         # Testamos operar de 3.0 nós até um pouco acima do design (para casos de calado leve onde sobra motor)
-        velocidades_op_teste = np.arange(3.0, v_design + 2.0, 0.1)
+        velocidades_op_teste = np.arange(0.0, v_design + 2.0, 0.1)
         design_valido = True
 
         for prof_mes in lista_prof_meses:
@@ -657,15 +689,12 @@ def run_global_optimization(
             opcoes_deste_mes = []
             
             for v_op in velocidades_op_teste:
-                # Check Físico de Potência: O motor aguenta essa velocidade neste calado?
-                # Recalculamos a demanda de potência para a condição específica do mês (calado atual).
-                vol_desloc_atual = engine.helpers.calcular_volume_operacional_balsa(
-                    params['comp_balsa'], params['boca_balsa'], calado_mes, params['coef_bloco']
-                ) * (n_long * n_par)
-                
+                # Verificação Física: O motor instalado consegue entregar a potência necessária?                
                 bhp_necessario = engine.helpers.calcular_bhp_propulsao(
-                    vol_desloc_atual, params['comp_balsa'], params['boca_balsa'],
-                    n_long, n_par, v_op, params['eficiencia_propulsor']
+                params['comp_balsa'], params['boca_balsa'],
+                calado_m=calado_mes, largura_canal_m=params['largura_canal'],
+                profundidade_canal_m=prof_mes,
+                n_long=n_long, n_par=n_par, vel_nos=v_design, eficiencia_global=params['eficiencia_propulsor']
                 )
                 
                 # Restrição Física: Se a potência exigida > instalada, essa velocidade é impossível.
@@ -677,6 +706,8 @@ def run_global_optimization(
                 res_var = engine.calcular_opex_variavel(
                     distancia_km=params['dist_km_input'],
                     dias_operacao_periodo=dias_op_por_mes,
+                    largura_canal=params['largura_canal'],
+                    profundidade_rio=prof_mes,
                     vel_embarcacao_nos=v_op,
                     vel_correnteza_nos=params['vel_correnteza_nos'],
                     calado_operacional=calado_mes,
@@ -704,7 +735,8 @@ def run_global_optimization(
                         'carga': res_var['carga_total_transportada'],
                         'custo_var': res_var['custo_variavel_total'] * 1.10, # Adiciona overhead variável (Admin)
                         'calado': calado_mes,
-                        'emissoes': res_var['emissoes_co2_ton']
+                        'emissoes': res_var['emissoes_co2_ton'],
+                        'bhp_utilizado': bhp_necessario
                     })
             
             # Se em algum mês não houver NENHUMA velocidade viável (ex: motor muito fraco para a correnteza),
@@ -783,6 +815,7 @@ def run_global_optimization(
                     'Mes': m + 1,
                     'Calado (m)': opt['calado'],
                     'Velocidade Op (nós)': opt['v_op'],
+                    'Potência (HP)': opt['bhp_utilizado'],
                     'Custo Mês (R$/t)': custo_mes_visual, 
                     'Carga (t)': opt['carga'],
                     'Emissões (tCO2)': opt['emissoes']
@@ -872,7 +905,7 @@ def run_environmental_analysis(
     """
     print("--- EXECUTANDO: Análise 7 - Sustentabilidade (CO2) ---")
     
-    velocidades = np.arange(4.0, 10.1, 0.1)
+    velocidades = np.arange(3.0, 8.1, 0.1)
     resultados = []
     
     for v in velocidades:

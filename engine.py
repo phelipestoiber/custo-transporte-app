@@ -13,6 +13,10 @@ def calcular_opex_variavel(
     # Inputs de Cenário
     distancia_km: float,
     dias_operacao_periodo: float,
+
+    # Inputs Ambientais
+    largura_canal: float,
+    profundidade_rio: float,
     
     # Inputs de Engenharia e Operação
     vel_embarcacao_nos: float,
@@ -110,8 +114,15 @@ def calcular_opex_variavel(
     # 4. Cálculo de Potência e Consumo (Engenharia)
     # Potência necessária nos motores principais para vencer a resistência hidrodinâmica
     bhp_propulsao = helpers.calcular_bhp_propulsao(
-        vol_desloc_comboio, comp_balsa, boca_balsa, 
-        num_balsas_long, num_balsas_par, vel_embarcacao_nos, eficiencia_propulsor
+        comp_balsa=comp_balsa,
+        boca_balsa=boca_balsa,
+        calado_m=calado_operacional,
+        n_long=num_balsas_long,
+        n_par=num_balsas_par,
+        vel_nos=vel_embarcacao_nos,
+        largura_canal_m=largura_canal,
+        profundidade_canal_m=profundidade_rio,
+        eficiencia_global=eficiencia_propulsor
     )
     
     # Potência auxiliar (geradores) estimada como fração da principal

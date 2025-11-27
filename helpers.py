@@ -164,8 +164,8 @@ def calcular_arranjo_comboio(
     l_max_permitido = raio_curvatura_rio / 5.0
     b_max_permitido = largura_canal_rio
     
-    n_long_teorico = l_max_permitido / comp_balsa
-    n_par_teorico = b_max_permitido / boca_balsa
+    n_long_teorico = l_max_permitido / comp_balsa if l_max_permitido / comp_balsa <= 7 else 7
+    n_par_teorico = b_max_permitido / boca_balsa if b_max_permitido / boca_balsa <= 5 else 5
     
     num_long = math.floor(n_long_teorico)
     if num_long < 1: num_long = 1
@@ -343,62 +343,116 @@ def calcular_tempo_viagem_puro(
     return t_ida + t_volta
 
 def calcular_bhp_propulsao(
-    vol_deslocamento_m3: float,
     comp_balsa: float,
     boca_balsa: float,
+    calado_m: float,
     n_long: int,
     n_par: int,
     vel_nos: float,
-    eficiencia_global: float = 0.60
+    largura_canal_m: float,
+    profundidade_canal_m: float,
+    eficiencia_global: float = 0.50
 ) -> float:
     """
-    Estima a Potência de Freio (Brake Horsepower - BHP) necessária para mover
-    o comboio na velocidade desejada.
+    Estima a Potência (BHP) usando a formulação de Howe (1967) adaptada por Padovezi (1997) e (2003).
 
-    Utiliza uma formulação empírica baseada na resistência ao avanço, ajustada
-    para comboios fluviais. A relação entre potência e velocidade segue uma
-    função exponencial (aproximadamente cúbica), conforme validado por
-    Padovezi (1997) para condições de rios amazônicos e águas rasas.
+    Esta formulação é específica para comboios fluviais e considera os efeitos
+    de águas rasas e canais restritos, comuns na região Amazónica.
+
+    Fórmula Base (Padovezi, 1997, p. 33):
+        Pe (kW) = 0.14426 * F * Termo_Calado * Termo_Canal * L^0.38 * B^1.19 * V^3 + Delta_PE
+
+    Para Chatas Vazias (Tc < 0.80m) (Padovezi, 2003, p. 70):
+        Pe_total = Pe_howe + 1.83 * V^3
 
     Parâmetros:
-        vol_deslocamento_m3 (float): Volume total deslocado pelo comboio (m³).
-        comp_balsa (float): Comprimento de uma balsa (m).
-        boca_balsa (float): Boca de uma balsa (m).
-        n_long (int): Número de balsas na longitudinal.
-        n_par (int): Número de balsas na transversal (paralela).
-        vel_nos (float): Velocidade desejada em nós.
-        eficiencia_global (float): Eficiência propulsiva (Hélice + Eixo + Redutor).
-                                   Padrão conservador: 0.50 a 0.60.
+        comp_balsa, boca_balsa (float): Dimensões unitárias (m).
+        calado_m (float): Calado operacional (m) (Hc).
+        n_long (int): Número de chatas no comprimento (Colunas na terminologia Padovezi).
+        n_par (int): Número de chatas na largura (Linhas na terminologia Padovezi).
+        vel_nos (float): Velocidade na água em nós.
+        largura_canal_m (float): Largura do canal navegável (m) (W).
+        profundidade_canal_m (float): Profundidade do canal (m) (h).
+        eficiencia_global (float): Eficiência propulsiva (eta).
 
     Retorna:
-        float: Potência requerida dos motores principais em HP.
-
-    Nota de Uso:
-        Crítica para `engine.calcular_capex` (dimensionamento do motor) e
-        `engine.calcular_opex_variavel` (consumo de combustível).
+        float: Potência requerida (BHP) em Cavalos-Vapor (HP).
     """
-    # 1. Fator Geométrico (Slenderness Ratio Proxy)
-    # A relação L/B do comboio influencia a resistência de onda.
-    # Comboios mais longos e estreitos têm melhor hidrodinâmica.
+    # 1. Conversão de Unidades
+    # Howe utiliza m/s para velocidade e metros para dimensões.
+    vel_ms = vel_nos * 0.514444
+    
+    # Dimensões Totais do Comboio (Lc e Bc)
     l_total = comp_balsa * n_long
     b_total = boca_balsa * n_par
-    ratio_geo = l_total / b_total if b_total > 0 else 1.0
     
-    # 2. Coeficiente de Resistência Específica (k)
-    # Valor base empírico ajustado para unidades de HP e nós (Ref: Howe/Padovezi)
-    # O valor 10.84e-5 é uma constante de calibração para cascos de fundo chato.
-    k_resistencia = 10.84 * (10**-5)
+    # 2. Definição do Fator de Forma (F) - Tabela 4.1 (Padovezi, 2003, p. 71)
+    if n_par == 1 and n_long == 1:
+        fator_f = 0.040  # Uma chata
+    elif n_par == 1 and n_long == 2:
+        fator_f = 0.050  # Duas chatas em linha (1 linha, 2 colunas)
+    elif n_par == 2 and n_long == 1:
+        fator_f = 0.043  # Duas chatas em paralelo (2 linhas, 1 coluna)
+    elif n_par == 1 and n_long == 3:
+        fator_f = 0.040  # Três chatas em linha
+    elif n_par == 2 and n_long == 2:
+        fator_f = 0.045  # Quatro chatas (2x2)
+    elif n_par == 2 and n_long == 3:
+        fator_f = 0.058  # Seis chatas (2 linhas, 3 colunas - Mais longo)
+    elif n_par == 3 and n_long == 2:
+        fator_f = 0.070  # Seis chatas (3 linhas, 2 colunas - Mais largo)
+    else:
+        fator_f = 0.070  # Outras formações (Default conservador)
+
+    # 3. Cálculo dos Termos da Equação de Howe 
+    # Termo Exponencial de Calado: e^(0.445 / (H - Tc))
+    termo_calado_exp = math.exp(0.445 / (profundidade_canal_m - calado_m))
     
-    # 3. Expoente de Velocidade
-    # Em águas profundas seria ~3.0. Em águas rasas (rios), a resistência aumenta
-    # mais rápido devido ao efeito squat e esteira, subindo para ~3.46.
-    exp_velocidade = 3.46
+    # Termo de Restrição Lateral (Largura do Canal): (Hc / 0.3048)^(0.6 + 15.24/(W - Bc))
+    # 0.3048 é a conversão de pés para metros, mantida da fórmula original.
+    folga_lateral = largura_canal_m - b_total
+    expoente_canal = 0.6 + (15.24 / folga_lateral)
+    termo_restricao = (calado_m / 0.3048) ** expoente_canal
     
-    # Fórmula de Potência: P = (k * Disp * (L/B)^-alpha * V^beta) / eta
-    # O termo (ratio_geo ** -0.473) penaliza comboios "largos" e premia os "longos".
-    bhp_teorico = (k_resistencia * vol_deslocamento_m3 * (ratio_geo ** -0.473) * (vel_nos ** exp_velocidade)) / eficiencia_global
+    # Potência Efetiva Base (kW) em Águas Profundas
+    pe_base_kw = (
+        0.14426 
+        * fator_f 
+        * termo_calado_exp 
+        * termo_restricao 
+        * (l_total ** 0.38) 
+        * (b_total ** 1.19) 
+        * (vel_ms ** 3)
+    )
+
+    # Para Chatas Vazias (Seção 4.1.1, p. 70)
+    # A fórmula de Howe subestima a resistência de empurradores grandes com chatas vazias.
+    if calado_m < 0.80:
+        pe_base_kw = pe_base_kw + (1.83 * (vel_ms ** 3))
     
-    return bhp_teorico
+    # # 4. Correção de Águas Rasas (Delta PE)
+    # # Baseado no Número de Froude de Profundidade (Fnh) [cite: 7693]
+    # g = 9.81
+    # froude_depth = vel_ms / math.sqrt(g * profundidade_canal_m)
+    
+    delta_pe_kw = 0.0
+    # if froude_depth > 0.50:
+    #     # Padovezi indica correção para Fnh > 0.50
+    #     # Fórmula: 75 * (V - 3.3)^3. V deve ser m/s.
+    #     # A correção só faz sentido físico se V > 3.3 m/s (~6.4 nós), 
+    #     # caso contrário o termo cúbico seria negativo ou zero.
+    #     if vel_ms > 3.3:
+    #         delta_pe_kw = 75.0 * ((vel_ms - 3.3) ** 3)
+            
+    pe_total_kw = pe_base_kw + delta_pe_kw
+    
+    # 5. Conversão final para BHP (Horsepower)
+    # 1 kW = 1.341 HP (mecânico/imperial)
+    # BHP = EHP / Eficiência Global
+    ehp_total = pe_total_kw * 1.34102
+    bhp_requerido = ehp_total / eficiencia_global
+    
+    return bhp_requerido
 
 def calcular_bhp_auxiliar(
     bhp_principal: float,
@@ -770,3 +824,135 @@ def calcular_margem_lucro(
         
     lucro = receita_total - custo_total
     return (lucro / receita_total) * 100.0
+
+if __name__ == "__main__":
+    # ==============================================================================
+    # BLOCO DE TESTE PARA: calcular_bhp_propulsao
+    # ==============================================================================
+
+    # Parâmetros de entrada para o teste
+    comp_balsa = 60.96
+    boca_balsa = 10.67
+    calado_m_inicial = 3.66
+    raio_curvatura_rio = 750
+    vel_nos = 5
+    largura_canal_m = 200
+    eficiencia_global = 0.5 # Eficiência 100% para ver a potência efetiva (EHP) em HP
+    LISTA_PROF_MESES = [ 7.72, 9.87, 10.86, 10.98, 8.43, 6.35, 5.12, 3.89, 3.30, 3.00, 3.65, 5.23 ]
+
+    print("\n--- PARÂMETROS GLOBAIS DO TESTE ---")
+    print(f"  > Comp. Balsa (unit): {comp_balsa} m")
+    print(f"  > Boca Balsa (unit): {boca_balsa} m")
+    print(f"  > Calado de Projeto: {calado_m_inicial} m")
+    print(f"  > Raio de Curvatura: {raio_curvatura_rio} m")
+    print(f"  > Largura do Canal: {largura_canal_m} m")
+    print(f"  > Velocidade Alvo: {vel_nos} nós")
+    print(f"  > Eficiência Global: {eficiencia_global}")
+
+    vel_ms = vel_nos * 0.514444
+
+    print(f"Velocidade em nós: {vel_nos} nós, velocidade em m/s: {vel_ms:.2f} m/s\n")
+        
+    n_long, n_par = calcular_arranjo_comboio(
+        comp_balsa=comp_balsa,
+        boca_balsa=boca_balsa,
+        raio_curvatura_rio=raio_curvatura_rio,
+        largura_canal_rio=largura_canal_m
+    )
+
+    n_long, n_par = 4, 5
+    print(f"Arranjo do comboio calculado: {n_long} balsas de comprimento x {n_par} balsas de largura.\n")
+
+    l_total = comp_balsa * n_long
+    b_total = boca_balsa * n_par
+    print(f"  > Comprimento Total do Comboio (L_total): {l_total:.2f} m")
+    print(f"  > Boca Total do Comboio (B_total): {b_total:.2f} m")
+
+
+    # 2. Definição do Fator de Forma (F) - Tabela 4.1 (Padovezi, 2003, p. 71)
+    if n_par == 1 and n_long == 1:
+        fator_f = 0.040  # Uma chata
+    elif n_par == 1 and n_long == 2:
+        fator_f = 0.050  # Duas chatas em linha (1 linha, 2 colunas)
+    elif n_par == 2 and n_long == 1:
+        fator_f = 0.043  # Duas chatas em paralelo (2 linhas, 1 coluna)
+    elif n_par == 1 and n_long == 3:
+        fator_f = 0.040  # Três chatas em linha
+    elif n_par == 2 and n_long == 2:
+        fator_f = 0.045  # Quatro chatas (2x2)
+    elif n_par == 2 and n_long == 3:
+        fator_f = 0.058  # Seis chatas (2 linhas, 3 colunas - Mais longo)
+    elif n_par == 3 and n_long == 2:
+        fator_f = 0.070  # Seis chatas (3 linhas, 2 colunas - Mais largo)
+    else:
+        fator_f = 0.070  # Outras formações (Default conservador)
+    
+    print(f"  > Fator de Forma (fator_f): {fator_f}")
+
+    print("\n--- CÁLCULO ITERATIVO POR PROFUNDIDADE (MÊS) ---")
+    for i, profundidade_canal_m in enumerate(LISTA_PROF_MESES):
+        print(f"\n----------------- MÊS {i+1:02d} -----------------")
+        print(f"  [ENTRADA] Profundidade do Canal (h): {profundidade_canal_m:.2f} m")
+
+        # Usa o calado inicial para cada iteração
+        calado_m = calado_m_inicial
+
+        # Proteção para evitar que a profundidade seja menor ou igual ao calado
+        if profundidade_canal_m <= calado_m + 0.5:
+            print(f"  [AVISO] Profundidade ({profundidade_canal_m:.2f}m) é menor ou igual ao calado + pé de piloto ({calado_m:.2f}m + 0,5m).")
+            # Ajusta o calado para ter uma folga mínima (ex: 0.5m)
+            calado_m = profundidade_canal_m - 0.5
+            if calado_m <= 0:
+                print("  [ERRO] Calado resultante é negativo ou zero. Impossível navegar. Pulando mês.")
+                continue
+            print(f"  [AJUSTE] Novo calado operacional (Tc): {calado_m:.2f} m")
+        else:
+            print(f"  > Calado Operacional (Tc): {calado_m:.2f} m (sem ajuste)")
+
+        # Cálculo dos Termos da Equação de Howe
+        # Termo Exponencial de Calado: e^(0.445 / (h - Tc))
+        termo_calado_exp = math.exp(0.445 / (profundidade_canal_m - calado_m))
+        print(f"  > Termo Calado Exp (termo_calado_exp): {termo_calado_exp:.4f}")
+            
+        # Termo de Restrição Lateral (Largura do Canal): (Tc / 0.3048)^(0.6 + 15.24/(W - Bc))
+        folga_lateral = largura_canal_m - b_total
+        print(f"  > Folga Lateral (largura_canal - b_total): {folga_lateral:.2f} m")
+        expoente_canal = 0.6 + (15.24 / folga_lateral)
+        print(f"  > Expoente do Canal (expoente_canal): {expoente_canal:.4f}")
+        termo_restricao = (calado_m / 0.3048) ** expoente_canal
+        print(f"  > Termo de Restrição (termo_restricao): {termo_restricao:.4f}")
+
+        # Potência Efetiva Base (kW) em Águas Profundas
+        pe_base_kw = (
+            0.14426 
+            * fator_f 
+            * termo_calado_exp 
+            * termo_restricao 
+            * (l_total ** 0.38) 
+            * (b_total ** 1.19) 
+            * (vel_ms ** 3)
+        )
+        print(f"  > Potência Base (pe_base_kw) [antes da correção]: {pe_base_kw:.4f} kW")
+
+        # Correção para Chatas Vazias (calado < 0.80m)
+        if calado_m < 0.80:
+            correcao_vazia = 1.83 * (vel_ms ** 3)
+            pe_base_kw = pe_base_kw + correcao_vazia
+            print(f"  [CORREÇÃO] Calado < 0.80m. Adicionando {correcao_vazia:.4f} kW.")
+            print(f"  > Potência Base (pe_base_kw) [após correção]: {pe_base_kw:.4f} kW")
+        
+        # Potência total em kW
+        pe_total_kw = pe_base_kw
+        print(f"  > Potência Efetiva Total (pe_total_kw): {pe_total_kw:.4f} kW")
+
+        # Conversão final para BHP (Horsepower)
+        # 1 kW = 1.34102 HP
+        ehp_total = pe_total_kw * 1.34102
+        print(f"  > Potência Efetiva Total (EHP): {ehp_total:.4f} HP")
+        
+        bhp_requerido = ehp_total / eficiencia_global
+        print(f"  \n  [RESULTADO FINAL MÊS {i+1:02d}] BHP Requerido: {bhp_requerido:,.2f} HP")
+
+    print("\n" + "="*60)
+    print("TESTE DETALHADO CONCLUÍDO")
+    print("="*60)
