@@ -95,58 +95,6 @@ def calcular_capacidade_carga_balsa(
     # Proteção contra valores negativos caso o calado seja insuficiente para flutuar a balsa vazia
     return max(0.0, capacidade)
 
-# def calcular_arranjo_comboio(
-#     comp_balsa: float,
-#     boca_balsa: float,
-#     raio_curvatura_rio: float,
-#     largura_canal_rio: float
-# ) -> Tuple[int, int]:
-#     """
-#     Define a formação ótima do comboio (nº de balsas longitudinais x transversais)
-#     respeitando as restrições geométricas da via navegável.
-
-#     Parâmetros:
-#         comp_balsa (float): Comprimento unitário da balsa (m).
-#         boca_balsa (float): Boca unitária da balsa (m).
-#         raio_curvatura_rio (float): Raio da curva mais restritiva do trecho (m).
-#         largura_canal_rio (float): Largura útil do canal de navegação (m).
-
-#     Retorna:
-#         Tuple[int, int]: Um par (num_longitudinal, num_paralela) representando o arranjo.
-
-#     Nota de Uso:
-#         Chamada por `engine.calcular_custos_comboio` e `analysis.run_global_optimization`
-#         para dimensionar a frota antes de calcular a hidrodinâmica.
-#     """
-#     # Restrição 1: Comprimento do Comboio (L_max)
-#     # Regra prática: O comprimento total rígido não deve exceder R/5 para garantir a inscrição na curva.
-#     # (Ref: PIANC / Normas da Marinha para navegação interior)
-#     l_max_comboio = raio_curvatura_rio / 5.0
-    
-#     # Restrição 2: Largura do Comboio (B_max)
-#     # A largura total deve ser menor que a largura do canal (excluindo margens de segurança implícitas aqui).
-#     b_max_comboio = largura_canal_rio
-    
-#     # Cálculo do número máximo teórico de balsas em cada dimensão
-#     # Usa-se divisão inteira (floor) pois não existe meia balsa.
-#     n_long_max = math.floor(l_max_comboio / comp_balsa)
-#     n_par_max = math.floor(b_max_comboio / boca_balsa)
-    
-#     # Regra de Estabilidade e Navegabilidade:
-#     # Evitar comboios muito "largos e curtos" que são instáveis direcionalmente.
-#     # A regra abaixo prioriza a formação longitudinal até que a relação L/B fique equilibrada,
-#     # mas permite expansão lateral se o rio for largo.
-#     # Lógica simplificada: Tenta manter n_long >= n_par se possível, ou preenche o retângulo permitido.
-    
-#     # Aqui adotamos a estratégia de maximizar a capacidade dentro do retângulo permitido (L_max * B_max).
-#     # Em uma implementação mais complexa, verificaríamos a resistência ao avanço para cada arranjo.
-    
-#     # Garante pelo menos 1 balsa se as dimensões permitirem
-#     n_long = max(1, n_long_max)
-#     n_par = max(1, n_par_max)
-    
-#     return int(n_long), int(n_par)
-
 def calcular_arranjo_comboio(
     comp_balsa: float,
     boca_balsa: float,
@@ -160,26 +108,40 @@ def calcular_arranjo_comboio(
     Retorna:
         (num_balsas_longitudinal, num_balsas_paralela)
     """
-    # Restrições geométricas empíricas
+    # Restrição 1: Comprimento do Comboio (L_max)
+    # Regra prática: O comprimento total rígido não deve exceder R/5 para garantir a inscrição na curva.
+    # (Ref: PIANC / Normas da Marinha para navegação interior)
     l_max_permitido = raio_curvatura_rio / 5.0
+    # Restrição 2: Largura do Comboio (B_max)
+    # A largura total do comboio não pode exceder a largura útil do canal.
     b_max_permitido = largura_canal_rio
     
+    # Calcula o número máximo teórico de balsas em cada direção, com limites práticos.
+    # Limites de 7 (longitudinal) e 5 (paralelo) são heurísticas para evitar arranjos
+    # excessivamente grandes que podem ter problemas de manobrabilidade não capturados
+    # pelas regras geométricas simples.
     n_long_teorico = l_max_permitido / comp_balsa if l_max_permitido / comp_balsa <= 7 else 7
     n_par_teorico = b_max_permitido / boca_balsa if b_max_permitido / boca_balsa <= 5 else 5
     
+    # O número de balsas deve ser um inteiro. Arredonda para baixo e garante no mínimo 1.
     num_long = math.floor(n_long_teorico)
     if num_long < 1: num_long = 1
     
-    # Regra heurística: Evitar comboios "mais largos que compridos" se possível,
+    # Regra heurística: Evitar comboios muito "mais largos que compridos" se possível,
     # mas respeitando a largura do canal.
-    razao_aspecto = num_long / n_par_teorico
+    # Isso melhora a estabilidade direcional e a manobrabilidade.
+    # Uma razão de aspecto < 1 indica que o comboio seria mais largo do que comprido.
+    razao_aspecto = num_long / n_par_teorico if n_par_teorico > 0 else float('inf')
     
     if razao_aspecto < 1.0:
-        # Se for ficar muito "quadrado" ou largo, limita pelo comprimento
+        # Se o arranjo tende a ser mais largo que comprido, limita-se a largura
+        # a um valor próximo ao comprimento (num_long + 1) para manter uma forma mais retangular.
         num_par = num_long + 1
     else:
+        # Caso contrário, aproveita a largura máxima permitida pelo canal.
         num_par = math.floor(n_par_teorico)
         
+    # Garante que haja pelo menos uma balsa na dimensão paralela.
     if num_par < 1: num_par = 1
     
     return int(num_long), int(num_par)
